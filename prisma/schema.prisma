@@ -1,0 +1,65 @@
+// prisma/schema.prisma
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mongodb"
+  url      = env("DATABASE_URL")
+}
+
+// --- MODÈLES ---
+
+enum Role {
+  USER
+  ADMIN
+}
+
+enum Status {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+model User {
+  id            String    @id @default(auto()) @map("_id") @db.ObjectId
+  email         String    @unique
+  password      String?   // Optionnel car vide à la création par l'admin
+  name          String?
+  role          Role      @default(USER)
+  setupToken    String?   // Token temporaire pour l'initialisation du compte
+  createdAt     DateTime  @default(now())
+  
+  reservations  Reservation[]
+  votes         AdminVote[]
+}
+
+model Reservation {
+  id            String      @id @default(auto()) @map("_id") @db.ObjectId
+  startDate     DateTime
+  endDate       DateTime
+  status        Status      @default(PENDING)
+  createdAt     DateTime    @default(now())
+  
+  userId        String      @db.ObjectId
+  user          User        @relation(fields: [userId], references: [id])
+  
+  votes         AdminVote[]
+}
+
+model AdminVote {
+  id            String      @id @default(auto()) @map("_id") @db.ObjectId
+  decision      Boolean     // true = OUI, false = NON
+  rejectReason  String?     // Texte explicatif si decision = false
+  votedAt       DateTime    @default(now())
+  
+  adminId       String      @db.ObjectId
+  admin         User        @relation(fields: [adminId], references: [id])
+  
+  reservationId String      @db.ObjectId
+  reservation   Reservation @relation(fields: [reservationId], references: [id])
+
+  // Un admin ne peut voter qu'une seule fois par réservation
+  @@unique([adminId, reservationId])
+}
